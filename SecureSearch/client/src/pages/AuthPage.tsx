@@ -1,0 +1,11 @@
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { ShieldCheck, LockKeyhole } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import { getError } from "../api";
+export default function AuthPage({mode}:{mode:"login"|"register"}) {
+ const {login,register}=useAuth(); const nav=useNavigate(); const [name,setName]=useState(""); const [email,setEmail]=useState(""); const [password,setPassword]=useState(""); const [error,setError]=useState(""); const [busy,setBusy]=useState(false);
+ const isRegister=mode==="register";
+ async function submit(e:React.FormEvent){e.preventDefault();setError("");setBusy(true);try{if(isRegister)await register(name,email,password);else await login(email,password);nav("/");}catch(err){setError(getError(err));}finally{setBusy(false);}}
+ return <div className="auth-screen"><div className="auth-card"><div className="auth-brand"><div className="brand-icon"><ShieldCheck/></div><span>Secure<span className="mint">Search</span></span></div><div className="auth-heading"><h1>{isRegister?"Create your workspace":"Welcome back"}</h1><p>{isRegister?"Your private document search starts here.":"Sign in to access your encrypted documents."}</p></div><form onSubmit={submit} className="form-stack">{isRegister&&<label>Full name<input value={name} onChange={e=>setName(e.target.value)} required minLength={2} placeholder="Your name"/></label>}<label>Email address<input type="email" value={email} onChange={e=>setEmail(e.target.value)} required placeholder="you@example.com"/></label><label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} required minLength={isRegister?8:1} placeholder={isRegister?"At least 8 characters":"Your password"}/></label>{error&&<div className="error-box">{error}</div>}<button className="primary-button full" disabled={busy}>{busy?"Please wait…":isRegister?"Create account":"Sign in"}</button></form><p className="auth-switch">{isRegister?"Already have an account?":"New to SecureSearch?"} <Link to={isRegister?"/login":"/register"}>{isRegister?"Sign in":"Create an account"}</Link></p><div className="auth-foot"><LockKeyhole size={14}/> Your files are encrypted before they are stored.</div></div></div>;
+}
