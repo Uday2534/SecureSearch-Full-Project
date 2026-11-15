@@ -12,7 +12,7 @@ import {
 } from "./workflow";
 import { DianaClient } from "./diana";
 
-const MAX_SECURE_FILE_BYTES = 8 * 1024 * 1024;
+const MAX_SECURE_FILE_BYTES = 5 * 1024 * 1024;
 const SUPPORTED = new Set(["txt", "csv", "md", "markdown", "json", "html", "htm", "xml", "log"]);
 
 function extension(name: string): string {
@@ -167,11 +167,12 @@ export async function searchAndDecryptDocuments(args: {
 
     const envelope = JSON.parse(item.record.value) as { iv: string; ciphertext: string };
     const key = await importDocumentKey(metadata.key);
-    const plaintext = await decryptFileBytes(
-      base64ToBytes(envelope.ciphertext).buffer,
-      envelope.iv,
-      key,
-    );
+    const encryptedBytes = base64ToBytes(envelope.ciphertext);
+    const encryptedBuffer = encryptedBytes.buffer.slice(
+      encryptedBytes.byteOffset,
+      encryptedBytes.byteOffset + encryptedBytes.byteLength,
+    ) as ArrayBuffer;
+    const plaintext = await decryptFileBytes(encryptedBuffer, envelope.iv, key);
     const payload = JSON.parse(new TextDecoder().decode(plaintext)) as {
       name: string; mimeType: string; contentBase64: string;
     };
@@ -179,7 +180,7 @@ export async function searchAndDecryptDocuments(args: {
     results.push({
       name: payload.name,
       mimeType: payload.mimeType,
-      blob: new Blob([content], { type: payload.mimeType }),
+      blob: new Blob([content.buffer.slice(content.byteOffset, content.byteOffset + content.byteLength) as ArrayBuffer], { type: payload.mimeType }),
       documentIndex: index,
     });
   }
