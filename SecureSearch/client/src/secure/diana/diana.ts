@@ -86,7 +86,11 @@ function validateCount(count: number): void {
   }
 }
 
-function secureRandomBytes(length: number): Uint8Array {\n  const bytes = new Uint8Array(length);\n  globalThis.crypto.getRandomValues(bytes);\n  return bytes;\n}\n\nexport class DianaClient {
+function secureRandomBytes(length: number): Uint8Array {
+  const bytes = new Uint8Array(length);
+  globalThis.crypto.getRandomValues(bytes);
+  return bytes;
+}\n\nexport class DianaClient {
   readonly #derivationMasterKey: Uint8Array;
   readonly #keywordTokenMasterKey: Uint8Array;
   readonly #counters = new Map<string, number>();
