@@ -41,10 +41,10 @@ jobs:
           from pathlib import Path
           root = Path("/tmp/opensse-schemes/CMakeLists.txt")
           source = root.read_text()
-          source = source.replace("find_package(Protobuf)\\nfind_package(GRPC)\\n", "")
-          source = source.replace("add_subdirectory(src)\\n", "")
-          source = source.replace("add_subdirectory(test)\\n", "")
-          source += "\\nadd_executable(diana_upstream_debug test/debug_diana.cpp)\\ntarget_link_libraries(diana_upstream_debug OpenSSE::schemes)\\n"
+          source = source.replace("find_package(Protobuf)" + chr(10) + "find_package(GRPC)" + chr(10), "")
+          source = source.replace("add_subdirectory(src)" + chr(10), "")
+          source = source.replace("add_subdirectory(test)" + chr(10), "")
+          source += chr(10) + "add_executable(diana_upstream_debug test/debug_diana.cpp)" + chr(10) + "target_link_libraries(diana_upstream_debug OpenSSE::schemes)" + chr(10)
           root.write_text(source)
           lib = Path("/tmp/opensse-schemes/lib/CMakeLists.txt")
           source = lib.read_text()
