@@ -172,4 +172,46 @@ router.post("/search-proof", authenticate, async (req, res, next) => {
   } catch (error) { return next(error); }
 });
 
+
+/** Batch write for documents with many distinct keywords. Each item is idempotent by address/revision/digest. */
+router.post("/records/batch", authenticate, async (req, res, next) => {
+  try {
+    const parsed = z.object({ records: z.array(recordSchema).min(1).max(250) }).strict().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Invalid opaque record batch", issues: parsed.error.issues });
+    const addresses = parsed.data.records.map((record) => `${record.namespace}:${record.address}`);
+    if (new Set(addresses).size !== addresses.length) {
+      return res.status(400).json({ message: "Duplicate addresses in batch are not allowed" });
+    }
+    const output = [];
+    for (const item of parsed.data.records) {
+      const valueDigest = digest(item.value);
+      let record = await SecureRecord.findOneAndUpdate(
+        {
+          owner: req.userId, namespace: item.namespace, address: item.address,
+          $or: [{ revision: { $lt: item.revision } }, { revision: { $exists: false } }],
+        },
+        { $set: { value: item.value, valueDigest, revision: item.revision, batchId: item.batchId } },
+        { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true },
+      ).select("namespace address value valueDigest revision batchId updatedAt").lean();
+
+      if (!record) {
+        const current = await SecureRecord.findOne({
+          owner: req.userId, namespace: item.namespace, address: item.address,
+        }).select("namespace address value valueDigest revision batchId updatedAt").lean();
+        if (current && current.revision === item.revision && current.valueDigest === valueDigest) {
+          record = current;
+        } else {
+          return res.status(409).json({
+            message: "Stale or conflicting record in batch",
+            address: item.address,
+            currentRevision: current?.revision ?? null,
+          });
+        }
+      }
+      output.push(record);
+    }
+    return res.status(200).json({ records: output });
+  } catch (error) { return next(error); }
+});
+
 export default router;
