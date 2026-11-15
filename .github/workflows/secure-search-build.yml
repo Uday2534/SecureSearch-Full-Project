@@ -54,7 +54,7 @@ jobs:
             ${CRYPTO_ROOT}/utils.cpp ${CRYPTO_ROOT}/set_hash.cpp
             ${CRYPTO_ROOT}/wrapper.cpp ${CRYPTO_ROOT}/hash.cpp
             ${CRYPTO_ROOT}/hash/blake2b.cpp ${CRYPTO_ROOT}/rcprf.cpp)
-          target_include_directories(sse_crypto PUBLIC ${CRYPTO_ROOT}/include PRIVATE ${CRYPTO_ROOT})
+          target_include_directories(sse_crypto PUBLIC ${CRYPTO_ROOT}/include PRIVATE ${CRYPTO_ROOT} ${CRYPTO_ROOT}/include/sse/crypto)
           target_link_libraries(sse_crypto ${SODIUM_LIBRARY})
           target_compile_features(sse_crypto PUBLIC cxx_std_11)
           add_library(OpenSSE::crypto ALIAS sse_crypto)
