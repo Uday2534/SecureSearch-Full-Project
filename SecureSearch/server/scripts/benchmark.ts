@@ -135,7 +135,8 @@ function chooseQueries(docs: Doc[]) {
 }
 async function mongoStats() {
   const db = mongoose.connection.db!;
-  const stats = await db.command({ dbStats: 1 });
+  let stats: any = {};
+  try { stats = await db.command({ dbStats: 1 }); } catch { /* some hosted roles restrict dbStats */ }
   async function collection(name: string) {
     try { return await db.command({ collStats: name }); }
     catch { return { count: 0, size: 0, storageSize: 0, totalIndexSize: 0 }; }
