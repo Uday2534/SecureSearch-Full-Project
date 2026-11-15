@@ -55,13 +55,13 @@ export interface ProvenSecureRecord {
   proof: MerkleProof;
 }
 
-export async function fetchDianaSearchProofs(addresses: string[]): Promise<{
-  root: string;
-  records: ProvenSecureRecord[];
-}> {
+export async function fetchSecureRecordProofs(entries: Array<{
+  namespace: SecureNamespace;
+  address: string;
+}>): Promise<{ root: string; records: ProvenSecureRecord[] }> {
   const response = await api.post<{ root: string; records: ProvenSecureRecord[] }>(
     "/secure/search-proof",
-    { addresses },
+    { entries },
   );
   return response.data;
 }
