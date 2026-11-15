@@ -19,6 +19,9 @@ jobs:
       - name: Install client dependencies
         working-directory: SecureSearch/client
         run: npm install
+      - name: Run Diana unit tests
+        working-directory: SecureSearch/client
+        run: npm test
       - name: Build client
         working-directory: SecureSearch/client
         run: npm run build
