@@ -155,7 +155,7 @@ router.post("/search-proof", authenticate, async (req, res, next) => {
     const leaves = stored.map((record) => ({
       key: `${record.namespace}:${record.address}`,
       valueDigest: record.valueDigest,
-    })).sort((a, b) => a.key.localeCompare(b.key));
+    })).sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
 
     const records = parsed.data.entries.map(({ namespace, address }) => {
       const record = stored.find((item) => item.namespace === namespace && item.address === address);
