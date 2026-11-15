@@ -116,7 +116,7 @@ export async function searchDianaKeyword(args: {
     throw new Error("Secure index root mismatch: server state differs from the locally trusted index.");
   }
 
-  const returned = new Map(response.records.map(({ record, proof }) => [record.address, { record, proof }]));
+  const returned = new Map(response.records.map(({ record, proof }) => [record.address, { record, proof }] as const));
   if (returned.size !== expectedAddresses.length ||
       expectedAddresses.some((address) => !returned.has(address))) {
     throw new Error("Search completeness verification failed: one or more expected postings are missing or duplicated.");
