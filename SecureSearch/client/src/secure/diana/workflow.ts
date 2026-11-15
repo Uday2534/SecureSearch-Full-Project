@@ -1,7 +1,9 @@
-import { bytesToHex, secureTextEncoder } from "../crypto";
+import { bytesToHex, sha256, secureTextEncoder } from "../crypto";
 import { sealVaultState } from "../crypto";
 import { saveEncryptedVault } from "../vaultStorage";
-import { putSecureRecord } from "../api";
+import { putSecureRecord, fetchDianaSearchProofs } from "../api";
+import { computeMerkleRoot, verifyMerkleInclusion } from "../merkle";
+import { uint64FromLittleEndian, xorBytes } from "./bytes";
 import { DianaClient } from "./diana";
 
 export interface SecureVaultState {
@@ -9,29 +11,44 @@ export interface SecureVaultState {
   dianaState: string;
   nextDocumentIndex: string;
   documentKeys: Record<string, string>;
+  /** key -> SHA-256(value), retained locally to anchor the Merkle root */
+  trustedLeaves: Record<string, string>;
+  trustedRoot: string;
 }
 
 export function normalizeSecureKeywords(text: string): string[] {
   return Array.from(new Set(
     text.normalize("NFKC")
       .toLocaleLowerCase("und")
-      .match(/[\p{L}\p{N}]+/gu) ?? [],
+      .match(/[\\p{L}\\p{N}]+/gu) ?? [],
   ));
 }
 
-export function createSecureVaultState(): { client: DianaClient; state: SecureVaultState } {
+export async function createSecureVaultState(): Promise<{ client: DianaClient; state: SecureVaultState }> {
   const client = DianaClient.setup();
+  const trustedLeaves: Record<string, string> = {};
+  const trustedRoot = await computeMerkleRoot([]);
   return {
     client,
-    state: { version: 1, dianaState: client.serializeState(), nextDocumentIndex: "1", documentKeys: {} },
+    state: {
+      version: 1,
+      dianaState: client.serializeState(),
+      nextDocumentIndex: "1",
+      documentKeys: {},
+      trustedLeaves,
+      trustedRoot,
+    },
   };
 }
 
+async function persistState(state: SecureVaultState, passphrase: string): Promise<void> {
+  await saveEncryptedVault(await sealVaultState(state, passphrase));
+}
+
 /**
- * Adds one document's keyword postings. For each posting the counter is
- * advanced only after the server acknowledges an idempotent opaque write.
- * The encrypted vault is saved after each acknowledgement, so a refresh
- * cannot silently reuse a committed Diana leaf.
+ * Add Diana postings with per-keyword acknowledgement and durable encrypted
+ * state. If a later posting fails, earlier acknowledged postings remain
+ * committed and the saved counters/root describe that partial batch.
  */
 export async function addDocumentPostings(args: {
   client: DianaClient;
@@ -46,12 +63,11 @@ export async function addDocumentPostings(args: {
 
   for (const keyword of uniqueKeywords) {
     const prepared = args.client.prepareUpdate(keyword, args.documentIndex);
-    const request = prepared.request;
-    const address = bytesToHex(request.token);
-    const value = bytesToBase64(request.index);
+    const address = bytesToHex(prepared.request.token);
+    const value = bytesToBase64(prepared.request.index);
     const batchId = crypto.randomUUID();
 
-    await putSecureRecord({
+    const stored = await putSecureRecord({
       namespace: "index",
       address,
       value,
@@ -60,17 +76,69 @@ export async function addDocumentPostings(args: {
     });
 
     args.client.commitUpdate(keyword, prepared.expectedCount);
+    const trustedLeaves = {
+      ...args.state.trustedLeaves,
+      [`index:${address}`]: stored.valueDigest,
+    };
     const nextState: SecureVaultState = {
       ...args.state,
       dianaState: args.client.serializeState(),
+      trustedLeaves,
+      trustedRoot: await computeMerkleRoot(
+        Object.entries(trustedLeaves).map(([key, valueDigest]) => ({ key, valueDigest })),
+      ),
     };
-    await saveEncryptedVault(await sealVaultState(nextState, args.passphrase));
+    await persistState(nextState, args.passphrase);
     args.state = nextState;
     completed += 1;
     args.onProgress?.(completed, uniqueKeywords.length);
   }
 
   return args.state;
+}
+
+/**
+ * Client derives every expected Diana address, asks the server for those
+ * records, then verifies the trusted root, every inclusion proof, and exact
+ * address-set equality before unmasking document indexes.
+ */
+export async function searchDianaKeyword(args: {
+  client: DianaClient;
+  keyword: string;
+  state: SecureVaultState;
+}): Promise<bigint[]> {
+  const expected = args.client.searchAddresses(args.keyword);
+  if (expected.length === 0) return [];
+
+  const expectedAddresses = expected.map((item) => bytesToHex(item.address));
+  const response = await fetchDianaSearchProofs(expectedAddresses);
+  if (response.root.toLowerCase() !== args.state.trustedRoot.toLowerCase()) {
+    throw new Error("Secure index root mismatch: server state differs from the locally trusted index.");
+  }
+
+  const returned = new Map(response.records.map(({ record, proof }) => [record.address, { record, proof }]));
+  if (returned.size !== expectedAddresses.length ||
+      expectedAddresses.some((address) => !returned.has(address))) {
+    throw new Error("Search completeness verification failed: one or more expected postings are missing or duplicated.");
+  }
+
+  const results: bigint[] = [];
+  for (const item of expected) {
+    const address = bytesToHex(item.address);
+    const found = returned.get(address)!;
+    const valid = await verifyMerkleInclusion(
+      `index:${address}`,
+      found.record.valueDigest,
+      found.proof,
+      response.root,
+    );
+    if (!valid) throw new Error(`Merkle proof verification failed for posting ${address}.`);
+
+    const maskedIndex = base64ToBytes(found.record.value);
+    if (maskedIndex.length !== 8) throw new Error("Invalid masked document index length.");
+    results.push(uint64FromLittleEndian(xorBytes(maskedIndex, item.mask)));
+  }
+  return results;
 }
 
 export function encodeSearchToken(keyword: string, client: DianaClient): {
