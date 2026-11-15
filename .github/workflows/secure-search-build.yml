@@ -34,11 +34,28 @@ jobs:
           git clone https://github.com/OpenSSE/opensse-schemes.git /tmp/opensse-schemes
           git -C /tmp/opensse-schemes checkout 084e80bb1223560d30024b7d20b165e3dfc64426
           git -C /tmp/opensse-schemes submodule update --init --recursive
+          # Build only the upstream Diana scheme and its own debug harness.
+          # The full upstream project also requires a separately built gRPC toolchain;
+          # it is not needed to run the local Diana client/server reference test.
+          python3 - <<'PY'
+          from pathlib import Path
+          root = Path("/tmp/opensse-schemes/CMakeLists.txt")
+          source = root.read_text()
+          source = source.replace("find_package(Protobuf)\\nfind_package(GRPC)\\n", "")
+          source = source.replace("add_subdirectory(src)\\n", "")
+          source = source.replace("add_subdirectory(test)\\n", "")
+          source += "\\nadd_executable(diana_upstream_debug test/debug_diana.cpp)\\ntarget_link_libraries(diana_upstream_debug OpenSSE::schemes)\\n"
+          root.write_text(source)
+          lib = Path("/tmp/opensse-schemes/lib/CMakeLists.txt")
+          source = lib.read_text()
+          source = source[:source.index("set(PROTOS")]
+          lib.write_text(source)
+          PY
           cmake -S /tmp/opensse-schemes -B /tmp/opensse-schemes/build -Dopensse_ENABLE_WERROR=OFF -DCMAKE_BUILD_TYPE=Release
-          cmake --build /tmp/opensse-schemes/build --target diana_debug -j2
+          cmake --build /tmp/opensse-schemes/build --target diana_upstream_debug -j2
           mkdir -p /tmp/opensse-diana-run
           cd /tmp/opensse-diana-run
-          /tmp/opensse-schemes/build/test/diana_debug | tee diana-output.txt
+          /tmp/opensse-schemes/build/diana_upstream_debug | tee diana-output.txt
           grep -F "Search toto. Results: [0, 1, 2," diana-output.txt
           grep -F "Search titi. Results: [0," diana-output.txt
           grep -F "Search tata. Results: [0," diana-output.txt
