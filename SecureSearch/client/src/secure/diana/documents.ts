@@ -1,6 +1,6 @@
 import {
   createDocumentKey, encryptFileBytes, exportDocumentKey, importDocumentKey,
-  decryptFileBytes, sha256, bytesToHex,
+  decryptFileBytes, sha256, bytesToHex, secureTextEncoder,
 } from "../crypto";
 import { putSecureRecord, fetchSecureRecordProofs } from "../api";
 import { saveEncryptedVault } from "../vaultStorage";
