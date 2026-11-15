@@ -19,6 +19,14 @@ jobs:
       - name: Install client dependencies
         working-directory: SecureSearch/client
         run: npm install
+      - name: Install C++ oracle dependency
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev
+      - name: Build and verify OpenSSE compatibility oracle
+        working-directory: SecureSearch
+        run: |
+          g++ -std=c++17 experiments/diana-reference/opensse-diana-oracle.cpp -lcrypto -o /tmp/opensse-diana-oracle
+          /tmp/opensse-diana-oracle > /tmp/opensse-vectors.generated.json
+          diff -u client/src/secure/diana/fixtures/opensse-vectors.json /tmp/opensse-vectors.generated.json
       - name: Run Diana unit tests
         working-directory: SecureSearch/client
         run: npm test
