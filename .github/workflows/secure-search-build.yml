@@ -41,6 +41,17 @@ jobs:
           if "#include <cstdint>" not in source:
               source = source.replace("#include <array>", "#include <array>" + chr(10) + "#include <cstdint>")
               header.write_text(source)
+          # The pinned crypto-tk headers rely on transitive standard-library includes
+          # that newer GCC no longer supplies. Add the required direct includes.
+          for relative in [
+              "third_party/crypto/src/include/sse/crypto/key.hpp",
+              "third_party/crypto/src/cipher.cpp",
+          ]:
+              path = Path("/tmp/opensse-schemes") / relative
+              source = path.read_text()
+              if "#include <stdexcept>" not in source:
+                  source = source.replace("#include <", "#include <stdexcept>" + chr(10) + "#include <", 1)
+                  path.write_text(source)
           PY
           # Build only the upstream Diana scheme and its own debug harness.
           # The full upstream project also requires a separately built gRPC toolchain;
