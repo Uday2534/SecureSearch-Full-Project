@@ -1,0 +1,30 @@
+name: SecureSearch integration build
+
+on:
+  push:
+    branches:
+      - feature/forward-private-verifiable-search
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install client dependencies
+        working-directory: SecureSearch/client
+        run: npm install
+      - name: Build client
+        working-directory: SecureSearch/client
+        run: npm run build
+      - name: Install server dependencies
+        working-directory: SecureSearch/server
+        run: npm install
+      - name: Build server
+        working-directory: SecureSearch/server
+        run: npm run build
