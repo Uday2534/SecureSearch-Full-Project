@@ -3,7 +3,7 @@ import { Search, FileSearch, Download, Sparkles, LockKeyhole, ShieldCheck } from
 import { api, getError } from "../api";
 import type { SearchResult } from "../types";
 import { formatSize } from "./Dashboard";
-import { unlockOrCreateVault } from "../secure/diana/vault";
+import { unlockExistingVault } from "../secure/diana/vault";
 import { searchAndDecryptDocuments, type DecryptedSecureDocument } from "../secure/diana/documents";
 import type { DianaClient } from "../secure/diana/diana";
 import type { SecureVaultState } from "../secure/diana/workflow";
@@ -45,7 +45,7 @@ export default function SearchPage() {
   async function unlockSecureVault() {
     setSecureError("");
     try {
-      const vault = await unlockOrCreateVault(passphrase);
+      const vault = await unlockExistingVault(passphrase);
       setSecureClient(vault.client); setSecureState(vault.state); setSecureReady(true);
     } catch (e) { setSecureError(getError(e)); }
   }
