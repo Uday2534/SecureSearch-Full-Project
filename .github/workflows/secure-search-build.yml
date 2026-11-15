@@ -27,6 +27,21 @@ jobs:
           g++ -std=c++17 experiments/diana-reference/opensse-diana-oracle.cpp -lcrypto -o /tmp/opensse-diana-oracle
           /tmp/opensse-diana-oracle > /tmp/opensse-vectors.generated.json
           diff -u client/src/secure/diana/fixtures/opensse-vectors.json /tmp/opensse-vectors.generated.json
+      - name: Build and run pinned upstream OpenSSE Diana executable
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libssl-dev libsodium-dev librocksdb-dev libgrpc++-dev protobuf-compiler-grpc libprotobuf-dev
+          git clone https://github.com/OpenSSE/opensse-schemes.git /tmp/opensse-schemes
+          git -C /tmp/opensse-schemes checkout 084e80bb1223560d30024b7d20b165e3dfc64426
+          git -C /tmp/opensse-schemes submodule update --init --recursive
+          cmake -S /tmp/opensse-schemes -B /tmp/opensse-schemes/build -Dopensse_ENABLE_WERROR=OFF -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/opensse-schemes/build --target diana_debug -j2
+          mkdir -p /tmp/opensse-diana-run
+          cd /tmp/opensse-diana-run
+          /tmp/opensse-schemes/build/test/diana_debug | tee diana-output.txt
+          grep -F "Search toto. Results: [0, 1, 2," diana-output.txt
+          grep -F "Search titi. Results: [0," diana-output.txt
+          grep -F "Search tata. Results: [0," diana-output.txt
       - name: Run Diana unit tests
         working-directory: SecureSearch/client
         run: npm test
