@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/forward-private-verifiable-search
+      - ci/upstream-diana-full-crypto-build
   pull_request:
     branches:
       - main
@@ -30,10 +31,26 @@ jobs:
       - name: Build and run pinned upstream OpenSSE Diana executable
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake libssl-dev libsodium-dev librocksdb-dev libgrpc++-dev protobuf-compiler-grpc libprotobuf-dev
+          sudo apt-get install -y build-essential cmake libssl-dev libsodium-dev libgmp-dev librocksdb-dev libgrpc++-dev protobuf-compiler-grpc libprotobuf-dev
           git clone https://github.com/OpenSSE/opensse-schemes.git /tmp/opensse-schemes
           git -C /tmp/opensse-schemes checkout 084e80bb1223560d30024b7d20b165e3dfc64426
           git -C /tmp/opensse-schemes submodule update --init --recursive
+          # The pinned crypto-tk revision requires RELIC 0.5.0. Build it with
+          # the GMP backend, matching the upstream crypto-tk documentation.
+          git clone --depth 1 --branch relic-toolkit-0.5.0 https://github.com/relic-toolkit/relic.git /tmp/relic
+          cmake -S /tmp/relic -B /tmp/relic/build -G "Unix Makefiles" \
+            -DSHLIB=on -DMULTI=PTHREAD \
+            -DCOMP="-O3 -funroll-loops -fomit-frame-pointer -finline-small-functions -fPIC" \
+            -DARCH=X64 -DRAND=UDEV \
+            -DWITH="BN;DV;FP;FPX;EP;EPX;PP;PC;MD" \
+            -DCHECK=off -DVERBS=off -DDEBUG=off -DBENCH=0 -DTESTS=1 \
+            -DARITH=gmp -DFP_PRIME=254 -DFP_QNRES=off \
+            -DFP_METHD="INTEG;INTEG;INTEG;MONTY;LOWER;SLIDE" \
+            -DFPX_METHD="INTEG;INTEG;LAZYR" -DPP_METHD="LAZYR;OATEP" \
+            -DBN_PRECI=256 -DFP_QNRES=on
+          cmake --build /tmp/relic/build --parallel 2
+          sudo cmake --install /tmp/relic/build
+          sudo ldconfig
           python3 - <<'PY'
           from pathlib import Path
           header = Path("/tmp/opensse-schemes/third_party/crypto/src/include/sse/crypto/random.hpp")
@@ -93,15 +110,54 @@ jobs:
           source = source.replace("add_subdirectory(test)" + chr(10), "")
           source = source.replace("add_subdirectory(third_party/crypto/src)", """
           set(CRYPTO_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/third_party/crypto/src)
+          list(APPEND CMAKE_MODULE_PATH ${CRYPTO_ROOT}/cmake/modules)
+          # crypto-tk 60b0db0 expects a Findrelic.cmake module, but that
+          # module is absent from the pinned submodule. Resolve the installed
+          # RELIC 0.5.0 headers and shared library explicitly.
+          file(WRITE ${CRYPTO_ROOT}/cmake/modules/Findrelic.cmake
+            "find_path(RLC_INCLUDE_DIR relic/relic.h)\\nfind_library(RLC_LIBRARY NAMES relic)\\ninclude(FindPackageHandleStandardArgs)\\nfind_package_handle_standard_args(relic REQUIRED_VARS RLC_INCLUDE_DIR RLC_LIBRARY)\\n")
           find_library(SODIUM_LIBRARY sodium REQUIRED)
+          find_library(GMP_LIBRARY gmp REQUIRED)
+          find_library(GMPXX_LIBRARY gmpxx REQUIRED)
           add_library(sse_crypto SHARED
-            ${CRYPTO_ROOT}/cipher.cpp ${CRYPTO_ROOT}/key.cpp
-            ${CRYPTO_ROOT}/prg.cpp ${CRYPTO_ROOT}/hmac.cpp
-            ${CRYPTO_ROOT}/prf.cpp ${CRYPTO_ROOT}/random.cpp
-            ${CRYPTO_ROOT}/wrapper.cpp ${CRYPTO_ROOT}/hash.cpp
-            ${CRYPTO_ROOT}/hash/blake2b.cpp ${CRYPTO_ROOT}/rcprf.cpp)
-          target_include_directories(sse_crypto PUBLIC ${CRYPTO_ROOT}/include PRIVATE ${CRYPTO_ROOT} ${CRYPTO_ROOT}/include/sse/crypto)
-          target_link_libraries(sse_crypto ${SODIUM_LIBRARY})
+            ${CRYPTO_ROOT}/cipher.cpp
+            ${CRYPTO_ROOT}/key.cpp
+            ${CRYPTO_ROOT}/prg.cpp
+            ${CRYPTO_ROOT}/tdp.cpp
+            ${CRYPTO_ROOT}/prp.cpp
+            ${CRYPTO_ROOT}/hmac.cpp
+            ${CRYPTO_ROOT}/prf.cpp
+            ${CRYPTO_ROOT}/puncturable_enc.cpp
+            ${CRYPTO_ROOT}/random.cpp
+            ${CRYPTO_ROOT}/utils.cpp
+            ${CRYPTO_ROOT}/set_hash.cpp
+            ${CRYPTO_ROOT}/rcprf.cpp
+            ${CRYPTO_ROOT}/wrapper.cpp
+            ${CRYPTO_ROOT}/hash.cpp
+            ${CRYPTO_ROOT}/hash/blake2b.cpp
+            ${CRYPTO_ROOT}/hash/sha512.cpp
+            ${CRYPTO_ROOT}/ppke/GMPpke.cpp
+            ${CRYPTO_ROOT}/ppke/util.cpp
+            ${CRYPTO_ROOT}/ppke/relic_wrapper/relic_api.cpp
+            ${CRYPTO_ROOT}/tdp_impl/tdp_impl_mbedtls.cpp
+            ${CRYPTO_ROOT}/tdp_impl/tdp_impl_openssl.cpp
+            ${CRYPTO_ROOT}/aez/aez.c
+            ${CRYPTO_ROOT}/mbedtls/asn1write.c
+            ${CRYPTO_ROOT}/mbedtls/bignum.c
+            ${CRYPTO_ROOT}/mbedtls/pk.c
+            ${CRYPTO_ROOT}/mbedtls/pkparse.c
+            ${CRYPTO_ROOT}/mbedtls/rsa_io.c
+            ${CRYPTO_ROOT}/mbedtls/asn1parse.c
+            ${CRYPTO_ROOT}/mbedtls/base64.c
+            ${CRYPTO_ROOT}/mbedtls/pem.c
+            ${CRYPTO_ROOT}/mbedtls/pk_wrap.c
+            ${CRYPTO_ROOT}/mbedtls/rsa.c)
+          target_include_directories(sse_crypto PUBLIC ${CRYPTO_ROOT}/include
+            PRIVATE ${CRYPTO_ROOT} ${CRYPTO_ROOT}/include/sse/crypto)
+          target_include_directories(sse_crypto SYSTEM PRIVATE
+            /usr/local/include ${CRYPTO_ROOT}/ppke/relic_wrapper)
+          target_link_libraries(sse_crypto ${SODIUM_LIBRARY} ${GMPXX_LIBRARY}
+            ${GMP_LIBRARY} ${RLC_LIBRARY})
           target_compile_features(sse_crypto PUBLIC cxx_std_11)
           add_library(OpenSSE::crypto ALIAS sse_crypto)
           """)
