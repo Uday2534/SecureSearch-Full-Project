@@ -59,6 +59,16 @@ jobs:
                   source = source.replace("#include <", "#include <stdexcept>" + chr(10) + "#include <", 1)
                   path.write_text(source)
           PY
+          # The pinned OpenSSE RocksDB wrapper sets an option removed in
+          # RocksDB 9.x. It is not required for Diana's counter-map behavior.
+          for relative in [
+              "lib/include/sse/schemes/utils/rocksdb_wrapper.hpp",
+              "lib/utils/rocksdb_wrapper.cpp",
+          ]:
+              path = Path("/tmp/opensse-schemes") / relative
+              source = path.read_text()
+              source = source.replace("    options.new_table_reader_for_compaction_inputs = true;" + chr(10), "")
+              path.write_text(source)
           # Build only the upstream Diana scheme and its own debug harness.
           # The full upstream project also requires a separately built gRPC toolchain;
           # it is not needed to run the local Diana client/server reference test.
