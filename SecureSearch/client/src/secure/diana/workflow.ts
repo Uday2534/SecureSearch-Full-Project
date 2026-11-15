@@ -1,7 +1,7 @@
 import { bytesToHex, sha256, secureTextEncoder } from "../crypto";
 import { sealVaultState } from "../crypto";
 import { saveEncryptedVault } from "../vaultStorage";
-import { putSecureRecords, fetchSecureRecordProofs } from "../api";
+import { putSecureRecord, fetchSecureRecordProofs } from "../api";
 import { computeMerkleRoot, verifyMerkleInclusion } from "../merkle";
 import { uint64FromLittleEndian, xorBytes } from "./bytes";
 import { DianaClient } from "./diana";
@@ -46,9 +46,10 @@ async function persistState(state: SecureVaultState, passphrase: string): Promis
 }
 
 /**
- * Add Diana postings with per-keyword acknowledgement and durable encrypted
- * state. If a later posting fails, earlier acknowledged postings remain
- * committed and the saved counters/root describe that partial batch.
+ * Add Diana postings one at a time. Each acknowledged posting is committed
+ * to the local Diana counter and encrypted vault before the next write starts.
+ * This avoids losing local counters when a multi-record server batch partially
+ * succeeds and then returns an error.
  */
 export async function addDocumentPostings(args: {
   client: DianaClient;
@@ -59,48 +60,34 @@ export async function addDocumentPostings(args: {
   onProgress?: (completed: number, total: number) => void;
 }): Promise<SecureVaultState> {
   const uniqueKeywords = Array.from(new Set(args.keywords));
-  const chunkSize = 200;
   let completed = 0;
 
-  for (let offset = 0; offset < uniqueKeywords.length; offset += chunkSize) {
-    const chunk = uniqueKeywords.slice(offset, offset + chunkSize);
-    const prepared = chunk.map((keyword) => ({
-      keyword,
-      update: args.client.prepareUpdate(keyword, args.documentIndex),
-    }));
-    const records = await Promise.all(prepared.map(async ({ update }) => {
-      const address = bytesToHex(update.request.token);
-      const value = bytesToBase64(update.request.index);
-      return {
-        input: {
-          namespace: "index" as const,
-          address,
-          value,
-          revision: update.expectedCount + 1,
-          batchId: crypto.randomUUID(),
-        },
-        expectedDigest: bytesToHex(await sha256(secureTextEncoder.encode(value))),
-      };
-    }));
+  for (const keyword of uniqueKeywords) {
+    const update = args.client.prepareUpdate(keyword, args.documentIndex);
+    const address = bytesToHex(update.request.token);
+    const value = bytesToBase64(update.request.index);
+    const input = {
+      namespace: "index" as const,
+      address,
+      value,
+      revision: update.expectedCount + 1,
+      batchId: crypto.randomUUID(),
+    };
+    const expectedDigest = bytesToHex(await sha256(secureTextEncoder.encode(value)));
 
-    const stored = await putSecureRecords(records.map((record) => record.input));
-    if (stored.length !== records.length) {
-      throw new Error("Server returned an incomplete posting batch.");
+    // A single-record request cannot leave earlier records from this logical
+    // batch committed without their corresponding local Diana counter.
+    const actual = await putSecureRecord(input);
+    if (actual.address !== address ||
+        actual.valueDigest.toLowerCase() !== expectedDigest) {
+      throw new Error(`Server acknowledged an unexpected posting for address ${address}.`);
     }
 
-    const trustedLeaves = { ...args.state.trustedLeaves };
-    for (let i = 0; i < records.length; i++) {
-      const expected = records[i]!;
-      const actual = stored[i]!;
-      if (actual.address !== expected.input.address ||
-          actual.valueDigest.toLowerCase() !== expected.expectedDigest) {
-        throw new Error("Server acknowledged an unexpected posting batch.");
-      }
-      const pending = prepared[i]!;
-      args.client.commitUpdate(pending.keyword, pending.update.expectedCount);
-      trustedLeaves[`index:${actual.address}`] = actual.valueDigest;
-    }
-
+    args.client.commitUpdate(keyword, update.expectedCount);
+    const trustedLeaves = {
+      ...args.state.trustedLeaves,
+      [`index:${actual.address}`]: actual.valueDigest,
+    };
     const nextState: SecureVaultState = {
       ...args.state,
       dianaState: args.client.serializeState(),
@@ -111,7 +98,7 @@ export async function addDocumentPostings(args: {
     };
     await persistState(nextState, args.passphrase);
     args.state = nextState;
-    completed += chunk.length;
+    completed += 1;
     args.onProgress?.(completed, uniqueKeywords.length);
   }
 
