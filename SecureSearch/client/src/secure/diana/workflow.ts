@@ -126,6 +126,10 @@ export async function searchDianaKeyword(args: {
   for (const item of expected) {
     const address = bytesToHex(item.address);
     const found = returned.get(address)!;
+    const actualDigest = bytesToHex(await sha256(secureTextEncoder.encode(found.record.value)));
+    if (actualDigest !== found.record.valueDigest.toLowerCase()) {
+      throw new Error(`Opaque posting digest mismatch for ${address}.`);
+    }
     const valid = await verifyMerkleInclusion(
       `index:${address}`,
       found.record.valueDigest,
