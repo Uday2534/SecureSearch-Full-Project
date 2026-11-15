@@ -1,7 +1,7 @@
 import { bytesToHex, sha256, secureTextEncoder } from "../crypto";
 import { sealVaultState } from "../crypto";
 import { saveEncryptedVault } from "../vaultStorage";
-import { putSecureRecord, fetchSecureRecordProofs } from "../api";
+import { putSecureRecords, fetchSecureRecordProofs } from "../api";
 import { computeMerkleRoot, verifyMerkleInclusion } from "../merkle";
 import { uint64FromLittleEndian, xorBytes } from "./bytes";
 import { DianaClient } from "./diana";
@@ -59,31 +59,48 @@ export async function addDocumentPostings(args: {
   onProgress?: (completed: number, total: number) => void;
 }): Promise<SecureVaultState> {
   const uniqueKeywords = Array.from(new Set(args.keywords));
+  const chunkSize = 200;
   let completed = 0;
 
-  for (const keyword of uniqueKeywords) {
-    const prepared = args.client.prepareUpdate(keyword, args.documentIndex);
-    const address = bytesToHex(prepared.request.token);
-    const value = bytesToBase64(prepared.request.index);
-    const batchId = crypto.randomUUID();
+  for (let offset = 0; offset < uniqueKeywords.length; offset += chunkSize) {
+    const chunk = uniqueKeywords.slice(offset, offset + chunkSize);
+    const prepared = chunk.map((keyword) => ({
+      keyword,
+      update: args.client.prepareUpdate(keyword, args.documentIndex),
+    }));
+    const records = await Promise.all(prepared.map(async ({ update }) => {
+      const address = bytesToHex(update.request.token);
+      const value = bytesToBase64(update.request.index);
+      return {
+        input: {
+          namespace: "index" as const,
+          address,
+          value,
+          revision: update.expectedCount + 1,
+          batchId: crypto.randomUUID(),
+        },
+        expectedDigest: bytesToHex(await sha256(secureTextEncoder.encode(value))),
+      };
+    }));
 
-    const expectedDigest = bytesToHex(await sha256(secureTextEncoder.encode(value)));
-    const stored = await putSecureRecord({
-      namespace: "index",
-      address,
-      value,
-      revision: prepared.expectedCount + 1,
-      batchId,
-    });
-
-    if (stored.valueDigest.toLowerCase() !== expectedDigest) {
-      throw new Error("Server acknowledged an unexpected posting digest.");
+    const stored = await putSecureRecords(records.map((record) => record.input));
+    if (stored.length !== records.length) {
+      throw new Error("Server returned an incomplete posting batch.");
     }
-    args.client.commitUpdate(keyword, prepared.expectedCount);
-    const trustedLeaves = {
-      ...args.state.trustedLeaves,
-      [`index:${address}`]: stored.valueDigest,
-    };
+
+    const trustedLeaves = { ...args.state.trustedLeaves };
+    for (let i = 0; i < records.length; i++) {
+      const expected = records[i]!;
+      const actual = stored[i]!;
+      if (actual.address !== expected.input.address ||
+          actual.valueDigest.toLowerCase() !== expected.expectedDigest) {
+        throw new Error("Server acknowledged an unexpected posting batch.");
+      }
+      const pending = prepared[i]!;
+      args.client.commitUpdate(pending.keyword, pending.update.expectedCount);
+      trustedLeaves[`index:${actual.address}`] = actual.valueDigest;
+    }
+
     const nextState: SecureVaultState = {
       ...args.state,
       dianaState: args.client.serializeState(),
@@ -94,7 +111,7 @@ export async function addDocumentPostings(args: {
     };
     await persistState(nextState, args.passphrase);
     args.state = nextState;
-    completed += 1;
+    completed += chunk.length;
     args.onProgress?.(completed, uniqueKeywords.length);
   }
 
