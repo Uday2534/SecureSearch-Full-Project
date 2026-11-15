@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "benchmark": "tsx scripts/benchmark.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -35,6 +36,7 @@
     "@types/node": "^22.10.5",
     "@types/pdf-parse": "^1.1.4",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "fake-indexeddb": "^6.0.0"
   }
 }
