@@ -65,3 +65,8 @@ export async function fetchSecureRecordProofs(entries: Array<{
   );
   return response.data;
 }
+
+export async function putSecureRecords(inputs: SecureRecordInput[]): Promise<SecureRecord[]> {
+  const response = await api.post<{ records: SecureRecord[] }>("/secure/records/batch", { records: inputs });
+  return response.data.records;
+}
