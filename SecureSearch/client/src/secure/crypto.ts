@@ -120,8 +120,30 @@ export async function encryptFileBytes(
 export function createDocumentKey(): Promise<CryptoKey> {
   return crypto.subtle.generateKey(
     { name: "AES-GCM", length: 256 },
-    false,
+    true,
     ["encrypt", "decrypt"],
+  );
+}
+
+export async function decryptFileBytes(
+  ciphertext: ArrayBuffer,
+  ivBase64: string,
+  contentKey: CryptoKey,
+): Promise<ArrayBuffer> {
+  return crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: fromBase64(ivBase64) },
+    contentKey,
+    ciphertext,
+  );
+}
+
+export async function exportDocumentKey(contentKey: CryptoKey): Promise<string> {
+  return toBase64(new Uint8Array(await crypto.subtle.exportKey("raw", contentKey)));
+}
+
+export async function importDocumentKey(rawBase64: string): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    "raw", fromBase64(rawBase64), { name: "AES-GCM" }, false, ["encrypt", "decrypt"],
   );
 }
 
