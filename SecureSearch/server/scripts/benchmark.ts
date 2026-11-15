@@ -1,4 +1,3 @@
-import "fake-indexeddb/auto";
 import { File } from "node:buffer";
 import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -23,6 +22,44 @@ const REPS = 5;
 const STOP = new Set("about after again against all also among another any are because been before being between both but can could did does doing down during each few for from further had has have having here how into its itself just more most other our out over own same should some such than that the their them then there these they this those through too under until very was were what when where which while who will with would your document documents company report notice public information section".split(" "));
 const storageShim = { token: "", getItem(k: string) { return k === "ss_token" ? this.token : null; }, setItem(k: string, v: string) { if (k === "ss_token") this.token = v; }, removeItem(k: string) { if (k === "ss_token") this.token = ""; } };
 (globalThis as any).localStorage = storageShim;
+
+// Minimal in-memory IndexedDB surface used by vaultStorage.ts. The benchmark
+// vault never touches disk and disappears when this Node process exits.
+const memoryDbs = new Map<string, Map<string, Map<string, unknown>>>();
+(globalThis as any).indexedDB = {
+  open(name: string, _version: number) {
+    const request: any = {};
+    queueMicrotask(() => {
+      let db = memoryDbs.get(name);
+      const isNew = !db;
+      if (!db) { db = new Map(); memoryDbs.set(name, db); }
+      const database: any = {
+        objectStoreNames: { contains: (store: string) => db!.has(store) },
+        createObjectStore: (store: string) => { if (!db!.has(store)) db!.set(store, new Map()); },
+        transaction: (store: string, _mode: string) => {
+          const tx: any = {};
+          tx.objectStore = () => ({
+            put: (value: unknown, key: string) => {
+              db!.get(store)!.set(key, value);
+              queueMicrotask(() => tx.oncomplete?.());
+            },
+            get: (key: string) => {
+              const req: any = {};
+              queueMicrotask(() => { req.result = db!.get(store)!.get(key); req.onsuccess?.(); });
+              return req;
+            },
+          });
+          return tx;
+        },
+        close: () => {},
+      };
+      request.result = database;
+      if (isNew) request.onupgradeneeded?.();
+      request.onsuccess?.();
+    });
+    return request;
+  },
+};
 api.defaults.baseURL = BASE + "/api";
 
 function csv(rows: any[], cols: string[]) {
