@@ -31,3 +31,11 @@ export async function unlockOrCreateVault(passphrase: string): Promise<UnlockedV
   if (!isVaultState(state)) throw new Error("Vault data is invalid or from an unsupported version.");
   return { client: DianaClient.restoreState(state.dianaState), state };
 }
+
+export async function unlockExistingVault(passphrase: string): Promise<UnlockedVault> {
+  const envelope = await loadEncryptedVault();
+  if (!envelope) throw new Error("No secure vault exists in this browser yet. Create it from the Upload page first.");
+  const state = await openVaultState<unknown>(envelope, passphrase);
+  if (!isVaultState(state)) throw new Error("Vault data is invalid or from an unsupported version.");
+  return { client: DianaClient.restoreState(state.dianaState), state };
+}
