@@ -59,6 +59,15 @@ jobs:
                   source = source.replace("#include <", "#include <stdexcept>" + chr(10) + "#include <", 1)
                   path.write_text(source)
           PY
+          # db_generator.hpp uses std::string but omits its direct header.
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("/tmp/opensse-schemes/lib/include/sse/schemes/utils/db_generator.hpp")
+          source = path.read_text()
+          if "#include <string>" not in source:
+              source = source.replace("#include <functional>", "#include <functional>" + chr(10) + "#include <string>")
+              path.write_text(source)
+          PY
           # The pinned OpenSSE RocksDB wrapper sets an option removed in
           # RocksDB 9.x. It is not required for Diana's counter-map behavior.
           python3 - <<'PY'
