@@ -99,4 +99,73 @@ router.get("/records", authenticate, async (req, res, next) => {
   } catch (error) { return next(error); }
 });
 
+
+function hashNode(left: Buffer, right: Buffer): Buffer {
+  return createHash("sha256").update(Buffer.concat([Buffer.from([1]), left, right])).digest();
+}
+function hashLeaf(key: string, valueDigest: string): Buffer {
+  return createHash("sha256").update(Buffer.concat([
+    Buffer.from([0]), Buffer.from(key, "utf8"), Buffer.from([0]), Buffer.from(valueDigest, "hex"),
+  ])).digest();
+}
+function buildMerkleProof(leaves: Array<{ key: string; valueDigest: string }>, targetKey: string) {
+  let level = leaves.map((leaf) => hashLeaf(leaf.key, leaf.valueDigest));
+  let index = leaves.findIndex((leaf) => leaf.key === targetKey);
+  if (index < 0) return null;
+  const leafIndex = index;
+  const siblings: Array<{ hash: string; side: "left" | "right" }> = [];
+  while (level.length > 1) {
+    const siblingIndex = index % 2 === 0 ? Math.min(index + 1, level.length - 1) : index - 1;
+    siblings.push({ hash: level[siblingIndex]!.toString("hex"), side: index % 2 === 0 ? "right" : "left" });
+    const next: Buffer[] = [];
+    for (let i = 0; i < level.length; i += 2) {
+      next.push(hashNode(level[i]!, level[i + 1] ?? level[i]!));
+    }
+    index = Math.floor(index / 2);
+    level = next;
+  }
+  return { leafIndex, leafCount: leaves.length, siblings, root: level[0]!.toString("hex") };
+}
+
+/**
+ * Returns requested opaque index records with inclusion proofs over the
+ * complete owner tree. Client compares the root to its locally trusted root
+ * and independently checks that every expected Diana address was returned.
+ */
+router.post("/search-proof", authenticate, async (req, res, next) => {
+  try {
+    const parsed = z.object({
+      addresses: z.array(addressSchema).min(1).max(5000),
+    }).strict().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Invalid search address set" });
+    if (new Set(parsed.data.addresses).size !== parsed.data.addresses.length) {
+      return res.status(400).json({ message: "Duplicate search addresses are not allowed" });
+    }
+
+    const stored = await SecureRecord.find({ owner: req.userId })
+      .select("namespace address value valueDigest revision batchId updatedAt")
+      .sort({ namespace: 1, address: 1 }).limit(50000).lean();
+    if (stored.length >= 50000) {
+      return res.status(413).json({ message: "Secure index exceeds proof endpoint limit; paginate or compact the index." });
+    }
+    const leaves = stored.map((record) => ({
+      key: `${record.namespace}:${record.address}`,
+      valueDigest: record.valueDigest,
+    })).sort((a, b) => a.key.localeCompare(b.key));
+
+    const records = parsed.data.addresses.map((address) => {
+      const record = stored.find((item) => item.namespace === "index" && item.address === address);
+      if (!record) return null;
+      const key = `index:${address}`;
+      const proof = buildMerkleProof(leaves, key);
+      return proof ? { record, proof: { leafIndex: proof.leafIndex, leafCount: proof.leafCount, siblings: proof.siblings } } : null;
+    }).filter((item): item is NonNullable<typeof item> => item !== null);
+
+    const root = leaves.length === 0
+      ? createHash("sha256").update(Buffer.alloc(0)).digest("hex")
+      : buildMerkleProof(leaves, leaves[0]!.key)!.root;
+    return res.json({ root, records });
+  } catch (error) { return next(error); }
+});
+
 export default router;
