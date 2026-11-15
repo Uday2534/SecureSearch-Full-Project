@@ -81,6 +81,7 @@ export async function uploadSecureDocument(args: {
     ciphertext: bytesToBase64(new Uint8Array(encrypted.ciphertext)),
   });
 
+  const expectedDigest = bytesToHex(await sha256(secureTextEncoder.encode(value)));
   const stored = await putSecureRecord({
     namespace: "document",
     address,
@@ -88,6 +89,10 @@ export async function uploadSecureDocument(args: {
     revision: 1,
     batchId: crypto.randomUUID(),
   });
+
+  if (stored.valueDigest.toLowerCase() !== expectedDigest) {
+    throw new Error("Server acknowledged an unexpected encrypted document digest.");
+  }
 
   const trustedLeaves = {
     ...args.state.trustedLeaves,
