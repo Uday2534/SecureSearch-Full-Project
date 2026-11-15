@@ -26,8 +26,8 @@ async function extractSearchableText(file: File): Promise<string> {
   }
   const text = await file.text();
   if (ext === "html" || ext === "htm" || ext === "xml") {
-    return text.replace(/<script[\\s\\S]*?<\\/script>/gi, " ")
-      .replace(/<style[\\s\\S]*?<\\/style>/gi, " ")
+    return text.replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
       .replace(/<[^>]+>/g, " ")
       .replace(/&nbsp;/gi, " ")
       .replace(/&amp;/gi, "&");
