@@ -90,7 +90,9 @@ function secureRandomBytes(length: number): Uint8Array {
   const bytes = new Uint8Array(length);
   globalThis.crypto.getRandomValues(bytes);
   return bytes;
-}\n\nexport class DianaClient {
+}
+
+export class DianaClient {
   readonly #derivationMasterKey: Uint8Array;
   readonly #keywordTokenMasterKey: Uint8Array;
   readonly #counters = new Map<string, number>();
