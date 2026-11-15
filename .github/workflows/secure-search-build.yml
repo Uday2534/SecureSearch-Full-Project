@@ -39,6 +39,7 @@ jobs:
           # the GMP backend, matching the upstream crypto-tk documentation.
           git clone --depth 1 --branch relic-toolkit-0.5.0 https://github.com/relic-toolkit/relic.git /tmp/relic
           cmake -S /tmp/relic -B /tmp/relic/build -G "Unix Makefiles" \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
             -DSHLIB=on -DMULTI=PTHREAD \
             -DCOMP="-O3 -funroll-loops -fomit-frame-pointer -finline-small-functions -fPIC" \
             -DARCH=X64 -DRAND=UDEV \
