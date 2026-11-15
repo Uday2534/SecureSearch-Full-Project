@@ -1,0 +1,134 @@
+name: SecureSearch integration build
+
+on:
+  push:
+    branches:
+      - feature/forward-private-verifiable-search
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install client dependencies
+        working-directory: SecureSearch/client
+        run: npm install
+      - name: Install C++ oracle dependency
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev
+      - name: Build and verify OpenSSE compatibility oracle
+        working-directory: SecureSearch
+        run: |
+          g++ -std=c++17 experiments/diana-reference/opensse-diana-oracle.cpp -lcrypto -o /tmp/opensse-diana-oracle
+          /tmp/opensse-diana-oracle > /tmp/opensse-vectors.generated.json
+          diff -u client/src/secure/diana/fixtures/opensse-vectors.json /tmp/opensse-vectors.generated.json
+      - name: Build and run pinned upstream OpenSSE Diana executable
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libssl-dev libsodium-dev librocksdb-dev libgrpc++-dev protobuf-compiler-grpc libprotobuf-dev
+          git clone https://github.com/OpenSSE/opensse-schemes.git /tmp/opensse-schemes
+          git -C /tmp/opensse-schemes checkout 084e80bb1223560d30024b7d20b165e3dfc64426
+          git -C /tmp/opensse-schemes submodule update --init --recursive
+          python3 - <<'PY'
+          from pathlib import Path
+          header = Path("/tmp/opensse-schemes/third_party/crypto/src/include/sse/crypto/random.hpp")
+          source = header.read_text()
+          if "#include <cstdint>" not in source:
+              source = source.replace("#include <array>", "#include <array>" + chr(10) + "#include <cstdint>")
+              header.write_text(source)
+          # hash.cpp also uses uint8_t directly and must include its defining header.
+          hash_source = Path("/tmp/opensse-schemes/third_party/crypto/src/hash.cpp")
+          source = hash_source.read_text()
+          if "#include <cstdint>" not in source:
+              source = source.replace("#include <array>", "#include <array>" + chr(10) + "#include <cstdint>")
+              hash_source.write_text(source)
+          # The pinned crypto-tk headers rely on transitive standard-library includes
+          # that newer GCC no longer supplies. Add the required direct includes.
+          for relative in [
+              "third_party/crypto/src/include/sse/crypto/key.hpp",
+              "third_party/crypto/src/cipher.cpp",
+          ]:
+              path = Path("/tmp/opensse-schemes") / relative
+              source = path.read_text()
+              if "#include <stdexcept>" not in source:
+                  source = source.replace("#include <", "#include <stdexcept>" + chr(10) + "#include <", 1)
+                  path.write_text(source)
+          PY
+          # db_generator.hpp uses std::string but omits its direct header.
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("/tmp/opensse-schemes/lib/include/sse/schemes/utils/db_generator.hpp")
+          source = path.read_text()
+          if "#include <string>" not in source:
+              source = source.replace("#include <functional>", "#include <functional>" + chr(10) + "#include <string>")
+              path.write_text(source)
+          PY
+          # The pinned OpenSSE RocksDB wrapper sets an option removed in
+          # RocksDB 9.x. It is not required for Diana's counter-map behavior.
+          python3 - <<'PY'
+          from pathlib import Path
+          for relative in [
+              "lib/include/sse/schemes/utils/rocksdb_wrapper.hpp",
+              "lib/utils/rocksdb_wrapper.cpp",
+          ]:
+              path = Path("/tmp/opensse-schemes") / relative
+              source = path.read_text()
+              source = source.replace("    options.new_table_reader_for_compaction_inputs = true;" + chr(10), "")
+              path.write_text(source)
+          PY
+          # Build only the upstream Diana scheme and its own debug harness.
+          # The full upstream project also requires a separately built gRPC toolchain;
+          # it is not needed to run the local Diana client/server reference test.
+          python3 - <<'PY'
+          from pathlib import Path
+          root = Path("/tmp/opensse-schemes/CMakeLists.txt")
+          source = root.read_text()
+          source = source.replace("find_package(Protobuf)" + chr(10) + "find_package(GRPC)" + chr(10), "")
+          source = source.replace("add_subdirectory(src)" + chr(10), "")
+          source = source.replace("add_subdirectory(test)" + chr(10), "")
+          source = source.replace("add_subdirectory(third_party/crypto/src)", """
+          set(CRYPTO_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/third_party/crypto/src)
+          find_library(SODIUM_LIBRARY sodium REQUIRED)
+          add_library(sse_crypto SHARED
+            ${CRYPTO_ROOT}/cipher.cpp ${CRYPTO_ROOT}/key.cpp
+            ${CRYPTO_ROOT}/prg.cpp ${CRYPTO_ROOT}/hmac.cpp
+            ${CRYPTO_ROOT}/prf.cpp ${CRYPTO_ROOT}/random.cpp
+            ${CRYPTO_ROOT}/wrapper.cpp ${CRYPTO_ROOT}/hash.cpp
+            ${CRYPTO_ROOT}/hash/blake2b.cpp ${CRYPTO_ROOT}/rcprf.cpp)
+          target_include_directories(sse_crypto PUBLIC ${CRYPTO_ROOT}/include PRIVATE ${CRYPTO_ROOT} ${CRYPTO_ROOT}/include/sse/crypto)
+          target_link_libraries(sse_crypto ${SODIUM_LIBRARY})
+          target_compile_features(sse_crypto PUBLIC cxx_std_11)
+          add_library(OpenSSE::crypto ALIAS sse_crypto)
+          """)
+          source += chr(10) + "add_executable(diana_upstream_debug test/debug_diana.cpp)" + chr(10) + "target_link_libraries(diana_upstream_debug OpenSSE::schemes)" + chr(10)
+          root.write_text(source)
+          lib = Path("/tmp/opensse-schemes/lib/CMakeLists.txt")
+          source = lib.read_text()
+          source = source[:source.index("set(PROTOS")]
+          lib.write_text(source)
+          PY
+          cmake -S /tmp/opensse-schemes -B /tmp/opensse-schemes/build -Dopensse_ENABLE_WERROR=OFF -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/opensse-schemes/build --target diana_upstream_debug -j2
+          mkdir -p /tmp/opensse-diana-run
+          cd /tmp/opensse-diana-run
+          /tmp/opensse-schemes/build/diana_upstream_debug | tee diana-output.txt
+          grep -F "Search toto. Results: [0, 1, 2," diana-output.txt
+          grep -F "Search titi. Results: [0," diana-output.txt
+          grep -F "Search tata. Results: [0," diana-output.txt
+      - name: Run Diana unit tests
+        working-directory: SecureSearch/client
+        run: npm test
+      - name: Build client
+        working-directory: SecureSearch/client
+        run: npm run build
+      - name: Install server dependencies
+        working-directory: SecureSearch/server
+        run: npm install
+      - name: Build server
+        working-directory: SecureSearch/server
+        run: npm run build
