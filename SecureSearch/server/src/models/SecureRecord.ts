@@ -20,7 +20,7 @@ const secureRecordSchema = new Schema<ISecureRecord>({
   owner: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
   namespace: { type: String, enum: ["index", "document"], required: true },
   address: { type: String, required: true, match: /^[0-9a-f]{32,64}$/i },
-  value: { type: String, required: true, maxlength: 2_000_000 },
+  value: { type: String, required: true, maxlength: 12_000_000 },
   valueDigest: { type: String, required: true, match: /^[0-9a-f]{64}$/i },
   revision: { type: Number, required: true, min: 1 },
   batchId: { type: String, required: true, maxlength: 80 },
