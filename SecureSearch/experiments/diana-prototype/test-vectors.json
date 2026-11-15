@@ -1,0 +1,55 @@
+{
+  "provenance": {
+    "primitiveVectors": "BLAKE2b-512 uses RFC 7693 test vectors. HMAC-BLAKE2b and original ChaCha20 are cross-checked against Node.js/OpenSSL crypto.",
+    "dianaVectors": "Deterministic outputs captured from this TypeScript source translation. They are regression vectors, not an independently executed OpenSSE binary comparison."
+  },
+  "blake2b512": [
+    {
+      "inputHex": "",
+      "outputHex": "786a02f742015903c6c6fd852552d272912f4740e15847618a86e217f71f5419d25e1031afee585313896444934eb04b903a685b1448b755d56f701afe9be2ce"
+    },
+    {
+      "inputHex": "616263",
+      "outputHex": "ba80a53f981c4d0d6a2797b69f12f6e94c212f14685ac4b74b12bb6fdbffa2d17d87c5392aab792dc252d5de4533cc9518d38aa8dbf1925ab92386edd4009923"
+    }
+  ],
+  "hmacBlake2b512": {
+    "keyHex": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+    "messageHex": "4869205468657265",
+    "outputHex": "358a6a184924894fc34bee5680eedf57d84a37bb38832f288e3b27dc63a98cc8c91e76da476b508bc6b2d408a248857452906e4a20b48c6b4b55d2df0fe1dd24"
+  },
+  "chacha20Original": {
+    "keyHex": "0000000000000000000000000000000000000000000000000000000000000000",
+    "nonceHex": "0000000000000000",
+    "counter": 0,
+    "outputHex": "76b8e0ada0f13d90405d6ae55386bd28bdd219b8a08ded1aa836efcc8b770dc7da41597c5157488d7724e03fb8d84a376a43b8f41518a11cc387b669b2ee6586"
+  },
+  "rcprf48Range0To2": {
+    "rootKeyHex": "0303030303030303030303030303030303030303030303030303030303030303",
+    "range": [0, 2],
+    "serializedHex": "300200000002000000000000000001000000000000009b5879fb65291a684dd46d8ceb0e69dd4c84f4b6a6e775659220f159ed3c605e0102000000000000000200000000000000e53afc5343744734b08e0386820d110a2a15c192d413926d63ef957fb8a06e1c",
+    "leafOutputsHex": [
+      "a66a2c66584e7917674ca34b577f5c3630c59d3d663a73a3f140548f29b37332",
+      "8d6924cbaa727e8013431a3a6c54037fce9a085b7f82f54693d9b45f7905b4e9",
+      "e53afc5343744734b08e0386820d110a2a15c192d413926d63ef957fb8a06e1c"
+    ]
+  },
+  "dianaUpdates": {
+    "derivationMasterKeyHex": "0101010101010101010101010101010101010101010101010101010101010101",
+    "keywordTokenMasterKeyHex": "0202020202020202020202020202020202020202020202020202020202020202",
+    "keyword": "kw_1",
+    "documentIndices": ["0", "1", "2"],
+    "updateTokensHex": [
+      "b713f972a51acb60f387074fb909e5a1",
+      "9f8aa979fd922e2e3c32300466aaf7fd",
+      "02ff5e9a521e914cac8ab40253233953"
+    ],
+    "maskedIndicesHex": [
+      "f1a128ea91d40044",
+      "5c98d64743b9776b",
+      "3199439f0cbb8b3e"
+    ],
+    "keywordTokenHex": "3a19b87d27ff47aed7664dee5cb5db8d2cca992ecdd184ff72e2239d620a0e79",
+    "constrainedKeyHex": "300200000002000000000000000001000000000000002462fbdb319d506f950fa0e51ba751ebada1c32a187861133af68265b2d81ab60102000000000000000200000000000000ccaf752bd7efab29c4f3ec3f6d331fe4c9d683bed6f98e73b8599364afa1a732"
+  }
+}
