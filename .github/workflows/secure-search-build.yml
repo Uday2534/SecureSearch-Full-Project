@@ -41,6 +41,12 @@ jobs:
           if "#include <cstdint>" not in source:
               source = source.replace("#include <array>", "#include <array>" + chr(10) + "#include <cstdint>")
               header.write_text(source)
+          # hash.cpp also uses uint8_t directly and must include its defining header.
+          hash_source = Path("/tmp/opensse-schemes/third_party/crypto/src/hash.cpp")
+          source = hash_source.read_text()
+          if "#include <cstdint>" not in source:
+              source = source.replace("#include <array>", "#include <array>" + chr(10) + "#include <cstdint>")
+              hash_source.write_text(source)
           # The pinned crypto-tk headers rely on transitive standard-library includes
           # that newer GCC no longer supplies. Add the required direct includes.
           for relative in [
