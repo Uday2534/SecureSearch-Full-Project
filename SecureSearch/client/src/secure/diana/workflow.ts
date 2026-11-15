@@ -20,7 +20,7 @@ export function normalizeSecureKeywords(text: string): string[] {
   return Array.from(new Set(
     text.normalize("NFKC")
       .toLocaleLowerCase("und")
-      .match(/[\\p{L}\\p{N}]+/gu) ?? [],
+      .match(/[\p{L}\p{N}]+/gu) ?? [],
   ));
 }
 
