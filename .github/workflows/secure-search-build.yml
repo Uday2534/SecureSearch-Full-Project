@@ -39,7 +39,7 @@ jobs:
           header = Path("/tmp/opensse-schemes/third_party/crypto/src/include/sse/crypto/random.hpp")
           source = header.read_text()
           if "#include <cstdint>" not in source:
-              source = source.replace("#include <array>", "#include <array>\\n#include <cstdint>")
+              source = source.replace("#include <array>", "#include <array>" + chr(10) + "#include <cstdint>")
               header.write_text(source)
           PY
           # Build only the upstream Diana scheme and its own debug harness.
