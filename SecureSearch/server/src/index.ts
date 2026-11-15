@@ -13,7 +13,7 @@ import { notFound, errorHandler } from "./middleware/error.js";
 const app = express();
 app.use(helmet());
 app.use(cors({ origin: env.CLIENT_ORIGIN, credentials: false }));
-app.use(express.json({ limit: "3mb" }));
+app.use(express.json({ limit: "12mb" }));
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, limit: 300, standardHeaders: true, legacyHeaders: false }));
 app.get("/api/health", (_req, res) => res.json({ status: "ok", service: "SecureSearch API" }));
 app.use("/api/auth", authRoutes);
