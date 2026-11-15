@@ -10,7 +10,7 @@ const addressSchema = z.string().regex(/^[0-9a-f]{32,64}$/i);
 const recordSchema = z.object({
   namespace: z.enum(["index", "document"]),
   address: addressSchema,
-  value: z.string().min(1).max(2_000_000),
+  value: z.string().min(1).max(12_000_000),
   revision: z.number().int().positive(),
   batchId: z.string().min(8).max(80).regex(/^[a-zA-Z0-9_-]+$/),
 }).strict();
