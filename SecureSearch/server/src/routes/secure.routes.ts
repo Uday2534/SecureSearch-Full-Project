@@ -135,11 +135,15 @@ function buildMerkleProof(leaves: Array<{ key: string; valueDigest: string }>, t
 router.post("/search-proof", authenticate, async (req, res, next) => {
   try {
     const parsed = z.object({
-      addresses: z.array(addressSchema).min(1).max(5000),
+      entries: z.array(z.object({
+        namespace: z.enum(["index", "document"]),
+        address: addressSchema,
+      }).strict()).min(1).max(5000),
     }).strict().safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Invalid search address set" });
-    if (new Set(parsed.data.addresses).size !== parsed.data.addresses.length) {
-      return res.status(400).json({ message: "Duplicate search addresses are not allowed" });
+    if (!parsed.success) return res.status(400).json({ message: "Invalid proof address set" });
+    const requestedKeys = parsed.data.entries.map((entry) => `${entry.namespace}:${entry.address}`);
+    if (new Set(requestedKeys).size !== requestedKeys.length) {
+      return res.status(400).json({ message: "Duplicate proof addresses are not allowed" });
     }
 
     const stored = await SecureRecord.find({ owner: req.userId })
@@ -153,10 +157,10 @@ router.post("/search-proof", authenticate, async (req, res, next) => {
       valueDigest: record.valueDigest,
     })).sort((a, b) => a.key.localeCompare(b.key));
 
-    const records = parsed.data.addresses.map((address) => {
-      const record = stored.find((item) => item.namespace === "index" && item.address === address);
+    const records = parsed.data.entries.map(({ namespace, address }) => {
+      const record = stored.find((item) => item.namespace === namespace && item.address === address);
       if (!record) return null;
-      const key = `index:${address}`;
+      const key = `${namespace}:${address}`;
       const proof = buildMerkleProof(leaves, key);
       return proof ? { record, proof: { leafIndex: proof.leafIndex, leafCount: proof.leafCount, siblings: proof.siblings } } : null;
     }).filter((item): item is NonNullable<typeof item> => item !== null);
