@@ -189,7 +189,7 @@ router.post("/records/batch", authenticate, async (req, res, next) => {
     if (new Set(addresses).size !== addresses.length) {
       return res.status(400).json({ message: "Duplicate addresses in batch are not allowed" });
     }
-    const output = [];
+    const output: unknown[] = [];
     for (const item of parsed.data.records) {
       const record = await storeOpaqueRecord(req.userId!, item);
       if (!record) {
