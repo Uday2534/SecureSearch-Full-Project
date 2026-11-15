@@ -56,7 +56,7 @@ export async function uploadSecureDocument(args: {
   onProgress?: (done: number, total: number) => void;
 }): Promise<SecureVaultState> {
   if (args.file.size === 0) throw new Error("The selected file is empty.");
-  if (args.file.size > MAX_SECURE_FILE_BYTES) throw new Error("Secure v2 currently limits files to 8 MB.");
+  if (args.file.size > MAX_SECURE_FILE_BYTES) throw new Error("Secure v2 currently limits files to 5 MB.");
   const searchableText = await extractSearchableText(args.file);
   const keywords = normalizeSecureKeywords(searchableText);
   if (keywords.length === 0) throw new Error("No searchable words were found in this file.");
