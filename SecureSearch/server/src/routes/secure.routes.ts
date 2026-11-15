@@ -32,11 +32,26 @@ router.post("/records", authenticate, async (req, res, next) => {
 
     const { namespace, address, value, revision, batchId } = parsed.data;
     const valueDigest = digest(value);
-    const record = await SecureRecord.findOneAndUpdate(
-      { owner: userId, namespace, address },
+    // Revisions are monotonic per address. A stale client cannot silently
+    // overwrite a newer opaque record with an older version.
+    let record = await SecureRecord.findOneAndUpdate(
+      {
+        owner: userId, namespace, address,
+        $or: [{ revision: { $lt: revision } }, { revision: { $exists: false } }],
+      },
       { $set: { value, valueDigest, revision, batchId } },
       { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true },
     ).select("namespace address value valueDigest revision batchId updatedAt").lean();
+
+    if (!record) {
+      const current = await SecureRecord.findOne({ owner: userId, namespace, address })
+        .select("namespace address value valueDigest revision batchId updatedAt").lean();
+      if (current && current.revision === revision && current.valueDigest === valueDigest) {
+        record = current;
+      } else {
+        return res.status(409).json({ message: "Stale or conflicting record revision", currentRevision: current?.revision ?? null });
+      }
+    }
 
     return res.status(200).json({ record });
   } catch (error) { return next(error); }
