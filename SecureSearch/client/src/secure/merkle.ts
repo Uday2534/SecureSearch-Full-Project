@@ -85,7 +85,7 @@ export interface MerkleLeaf {
 /** Computes the canonical root for a sorted set of authenticated map leaves. */
 export async function computeMerkleRoot(leaves: MerkleLeaf[]): Promise<string> {
   if (leaves.length === 0) return bytesToLowerHex(await sha256(new Uint8Array()));
-  const sorted = [...leaves].sort((a, b) => a.key.localeCompare(b.key));
+  const sorted = [...leaves].sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
   for (let i = 1; i < sorted.length; i++) {
     if (sorted[i - 1]!.key === sorted[i]!.key) throw new Error("Duplicate Merkle leaf key");
   }
