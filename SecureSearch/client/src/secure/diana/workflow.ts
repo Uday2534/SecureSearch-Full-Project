@@ -67,6 +67,7 @@ export async function addDocumentPostings(args: {
     const value = bytesToBase64(prepared.request.index);
     const batchId = crypto.randomUUID();
 
+    const expectedDigest = bytesToHex(await sha256(secureTextEncoder.encode(value)));
     const stored = await putSecureRecord({
       namespace: "index",
       address,
@@ -75,6 +76,9 @@ export async function addDocumentPostings(args: {
       batchId,
     });
 
+    if (stored.valueDigest.toLowerCase() !== expectedDigest) {
+      throw new Error("Server acknowledged an unexpected posting digest.");
+    }
     args.client.commitUpdate(keyword, prepared.expectedCount);
     const trustedLeaves = {
       ...args.state.trustedLeaves,
