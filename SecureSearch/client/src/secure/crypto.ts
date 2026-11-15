@@ -19,6 +19,12 @@ const ITERATIONS = 310_000;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
+}
+
 function toBase64(bytes: Uint8Array): string {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
@@ -37,14 +43,14 @@ async function deriveVaultKey(passphrase: string, salt: Uint8Array): Promise<Cry
 
   const material = await crypto.subtle.importKey(
     "raw",
-    encoder.encode(passphrase),
+    toArrayBuffer(encoder.encode(passphrase)),
     "PBKDF2",
     false,
     ["deriveKey"],
   );
 
   return crypto.subtle.deriveKey(
-    { name: "PBKDF2", hash: "SHA-256", salt, iterations: ITERATIONS },
+    { name: "PBKDF2", hash: "SHA-256", salt: toArrayBuffer(salt), iterations: ITERATIONS },
     material,
     { name: "AES-GCM", length: 256 },
     false,
@@ -131,7 +137,7 @@ export async function decryptFileBytes(
   contentKey: CryptoKey,
 ): Promise<ArrayBuffer> {
   return crypto.subtle.decrypt(
-    { name: "AES-GCM", iv: fromBase64(ivBase64) },
+    { name: "AES-GCM", iv: toArrayBuffer(fromBase64(ivBase64)) },
     contentKey,
     ciphertext,
   );
@@ -143,12 +149,12 @@ export async function exportDocumentKey(contentKey: CryptoKey): Promise<string> 
 
 export async function importDocumentKey(rawBase64: string): Promise<CryptoKey> {
   return crypto.subtle.importKey(
-    "raw", fromBase64(rawBase64), { name: "AES-GCM" }, false, ["encrypt", "decrypt"],
+    "raw", toArrayBuffer(fromBase64(rawBase64)), { name: "AES-GCM" }, false, ["encrypt", "decrypt"],
   );
 }
 
 export async function sha256(data: Uint8Array): Promise<Uint8Array> {
-  return new Uint8Array(await crypto.subtle.digest("SHA-256", data));
+  return new Uint8Array(await crypto.subtle.digest("SHA-256", toArrayBuffer(data)));
 }
 
 export function bytesToHex(bytes: Uint8Array): string {
