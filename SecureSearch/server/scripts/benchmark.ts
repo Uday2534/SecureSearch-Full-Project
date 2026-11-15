@@ -17,7 +17,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 const OUT = path.join(ROOT, "benchmark-results");
 const BASE = (process.env.BENCHMARK_API_URL || "http://127.0.0.1:5000").replace(/\/$/, "");
 const SEC_UA = process.env.SEC_USER_AGENT || "";
-const MAX_BYTES = 50 * 1024;
+const MAX_BYTES = 20 * 1024;
 const REPS = 5;
 const STOP = new Set("about after again against all also among another any are because been before being between both but can could did does doing down during each few for from further had has have having here how into its itself just more most other our out over own same should some such than that the their them then there these they this those through too under until very was were what when where which while who will with would your document documents company report notice public information section".split(" "));
 const storageShim = { token: "", getItem(k: string) { return k === "ss_token" ? this.token : null; }, setItem(k: string, v: string) { if (k === "ss_token") this.token = v; }, removeItem(k: string) { if (k === "ss_token") this.token = ""; } };
