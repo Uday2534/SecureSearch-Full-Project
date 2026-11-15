@@ -51,7 +51,7 @@ jobs:
           source = source[:source.index("set(PROTOS")]
           lib.write_text(source)
           PY
-          cmake -S /tmp/opensse-schemes -B /tmp/opensse-schemes/build -Dopensse_ENABLE_WERROR=OFF -DCMAKE_BUILD_TYPE=Release
+          cmake -S /tmp/opensse-schemes -B /tmp/opensse-schemes/build -Dopensse_ENABLE_WERROR=OFF -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_BUILD_TYPE=Release
           cmake --build /tmp/opensse-schemes/build --target diana_upstream_debug -j2
           mkdir -p /tmp/opensse-diana-run
           cd /tmp/opensse-diana-run
