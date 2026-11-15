@@ -56,7 +56,7 @@ jobs:
             ${CRYPTO_ROOT}/hash/blake2b.cpp ${CRYPTO_ROOT}/rcprf.cpp)
           target_include_directories(sse_crypto PUBLIC ${CRYPTO_ROOT}/include PRIVATE ${CRYPTO_ROOT} ${CRYPTO_ROOT}/include/sse/crypto)
           target_link_libraries(sse_crypto ${SODIUM_LIBRARY})
-          target_compile_features(sse_crypto PUBLIC cxx_std_11)
+          target_compile_features(sse_crypto PUBLIC cxx_std_11)\n          target_compile_options(sse_crypto PRIVATE -include stdexcept)
           add_library(OpenSSE::crypto ALIAS sse_crypto)
           """)
           source += chr(10) + "add_executable(diana_upstream_debug test/debug_diana.cpp)" + chr(10) + "target_link_libraries(diana_upstream_debug OpenSSE::schemes)" + chr(10)
