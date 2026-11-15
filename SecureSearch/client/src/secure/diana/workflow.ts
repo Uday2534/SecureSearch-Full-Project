@@ -1,7 +1,7 @@
 import { bytesToHex, sha256, secureTextEncoder } from "../crypto";
 import { sealVaultState } from "../crypto";
 import { saveEncryptedVault } from "../vaultStorage";
-import { putSecureRecord, fetchDianaSearchProofs } from "../api";
+import { putSecureRecord, fetchSecureRecordProofs } from "../api";
 import { computeMerkleRoot, verifyMerkleInclusion } from "../merkle";
 import { uint64FromLittleEndian, xorBytes } from "./bytes";
 import { DianaClient } from "./diana";
@@ -111,7 +111,7 @@ export async function searchDianaKeyword(args: {
   if (expected.length === 0) return [];
 
   const expectedAddresses = expected.map((item) => bytesToHex(item.address));
-  const response = await fetchDianaSearchProofs(expectedAddresses);
+  const response = await fetchSecureRecordProofs(expectedAddresses.map((address) => ({ namespace: "index" as const, address })));
   if (response.root.toLowerCase() !== args.state.trustedRoot.toLowerCase()) {
     throw new Error("Secure index root mismatch: server state differs from the locally trusted index.");
   }
