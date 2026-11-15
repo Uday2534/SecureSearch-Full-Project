@@ -77,7 +77,7 @@ Bytes deriveBranch(const Bytes& key, int branch) {
 }
 
 Bytes evaluateLeaf(Bytes nodeKey, uint64_t leaf) {
-  for (int bit = 47; bit >= 0; --bit) {
+  for (int bit = 46; bit >= 0; --bit) {
     const int branch = static_cast<int>((leaf >> bit) & 1U);
     if (bit == 0) return chacha20(nodeKey, static_cast<size_t>(branch) * 32, 32);
     nodeKey = deriveBranch(nodeKey, branch);
