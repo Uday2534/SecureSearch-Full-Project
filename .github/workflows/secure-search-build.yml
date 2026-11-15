@@ -30,11 +30,7 @@ jobs:
       - name: Build and run pinned upstream OpenSSE Diana executable
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake libssl-dev libsodium-dev librocksdb-dev libgrpc++-dev protobuf-compiler-grpc libprotobuf-dev libgmp-dev
-          git clone -b relic-toolkit-0.5.0 --single-branch https://github.com/relic-toolkit/relic.git /tmp/relic
-          cmake -S /tmp/relic -B /tmp/relic/build -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DMULTI=PTHREAD -DARCH=X64 -DRAND=UDEV -DWITH=BN\;DV\;FP\;FPX\;EP\;EPX\;PP\;PC\;MD -DCHECK=off -DVERBS=off -DDEBUG=off -DBENCH=0 -DTESTS=0 -DARITH=easy -DFP_PRIME=254 -DFP_QNRES=off -DFP_METHD=INTEG\;INTEG\;INTEG\;MONTY\;LOWER\;SLIDE -DFPX_METHD=INTEG\;INTEG\;LAZYR -DPP_METHD=LAZYR\;OATE -DBN_PRECI=256 -DCMAKE_INSTALL_PREFIX=/usr/local
-          cmake --build /tmp/relic/build -j2
-          sudo cmake --install /tmp/relic/build
+          sudo apt-get install -y build-essential cmake libssl-dev libsodium-dev librocksdb-dev libgrpc++-dev protobuf-compiler-grpc libprotobuf-dev
           git clone https://github.com/OpenSSE/opensse-schemes.git /tmp/opensse-schemes
           git -C /tmp/opensse-schemes checkout 084e80bb1223560d30024b7d20b165e3dfc64426
           git -C /tmp/opensse-schemes submodule update --init --recursive
