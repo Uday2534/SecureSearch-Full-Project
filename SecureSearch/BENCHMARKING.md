@@ -4,7 +4,7 @@ This benchmark compares the Legacy HMAC search path and Secure v2 using the same
 - 5 recent SEC EDGAR 8-K filings (Apple, Microsoft, Visa, Amazon and NVIDIA).
 - 5 recent Federal Register notices.
 
-It downloads the documents itself, extracts visible text, caps each normalized document at 50 KiB, and writes a source manifest. No manual upload is required.
+It downloads the documents itself, extracts visible text, caps each normalized document at 20 KiB, and writes a source manifest. No manual upload is required.
 
 ## Safety first
 - The runner creates a uniquely named temporary benchmark user.
