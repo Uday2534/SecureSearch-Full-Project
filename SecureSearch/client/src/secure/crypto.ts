@@ -68,9 +68,9 @@ export async function sealVaultState<T>(
   const key = await deriveVaultKey(passphrase, salt);
   const plaintext = encoder.encode(JSON.stringify(state));
   const ciphertext = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv },
+    { name: "AES-GCM", iv: toArrayBuffer(iv) },
     key,
-    plaintext,
+    toArrayBuffer(plaintext),
   );
 
   return {
@@ -100,9 +100,9 @@ export async function openVaultState<T>(
 
   const key = await deriveVaultKey(passphrase, fromBase64(envelope.salt));
   const plaintext = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv: fromBase64(envelope.iv) },
+    { name: "AES-GCM", iv: toArrayBuffer(fromBase64(envelope.iv)) },
     key,
-    fromBase64(envelope.ciphertext),
+    toArrayBuffer(fromBase64(envelope.ciphertext)),
   );
 
   return JSON.parse(decoder.decode(plaintext)) as T;
@@ -115,14 +115,14 @@ export async function encryptFileBytes(
 ): Promise<{ ciphertext: ArrayBuffer; iv: string }> {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const ciphertext = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv },
+    { name: "AES-GCM", iv: toArrayBuffer(iv) },
     contentKey,
     await file.arrayBuffer(),
   );
   return { ciphertext, iv: toBase64(iv) };
 }
 
-/** Creates a fresh non-extractable AES-GCM key for one document. */
+/** Creates a fresh AES-GCM key; export it only into the encrypted local vault. */
 export function createDocumentKey(): Promise<CryptoKey> {
   return crypto.subtle.generateKey(
     { name: "AES-GCM", length: 256 },
