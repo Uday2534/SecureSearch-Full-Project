@@ -1,0 +1,11 @@
+{
+  "keyword": "cloud",
+  "keywordIndex": "d1b1136f42f9066f8e6cde5f8654583c",
+  "rootKey": "4518d6263d6ff310978503651d922df9537a4a7476995d156cf16c2a583ca9c6",
+  "keywordToken": "00209deb00128ff5bf32216e0b4da1fd30376b940be352b304923009e52689a4",
+  "leaves": [
+    { "leaf": 0, "leafKey": "9feda6fe8e7dbe2c4933b4bcbb15f2aecbabccd3f1de48bcda7878e58e6bbe4e", "updateToken": "7444759d60fb3990b7097badb2dff52c", "mask": "e33bb5befec5dad7" },
+    { "leaf": 1, "leafKey": "e983094f9d8c3267b92c0112eb87bd469fc7219acf9d2a1b6dbf328915fbeca2", "updateToken": "9dd14ab7b1a02a04de1bc9a2737fd403", "mask": "6fcaaf64f3f66eb7" },
+    { "leaf": 2, "leafKey": "ed72a61c1040c8c0522b71a8504f6f7465ae81428ef9b4d00bdb29b4f0351012", "updateToken": "fc8032d39bb7a6798691e5c529b8fcaa", "mask": "c14713dc5233ebbe" }
+  ]
+}
