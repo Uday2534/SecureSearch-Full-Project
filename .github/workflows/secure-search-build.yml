@@ -34,6 +34,14 @@ jobs:
           git clone https://github.com/OpenSSE/opensse-schemes.git /tmp/opensse-schemes
           git -C /tmp/opensse-schemes checkout 084e80bb1223560d30024b7d20b165e3dfc64426
           git -C /tmp/opensse-schemes submodule update --init --recursive
+          python3 - <<'PY'
+          from pathlib import Path
+          header = Path("/tmp/opensse-schemes/third_party/crypto/src/include/sse/crypto/random.hpp")
+          source = header.read_text()
+          if "#include <cstdint>" not in source:
+              source = source.replace("#include <array>", "#include <array>\\n#include <cstdint>")
+              header.write_text(source)
+          PY
           # Build only the upstream Diana scheme and its own debug harness.
           # The full upstream project also requires a separately built gRPC toolchain;
           # it is not needed to run the local Diana client/server reference test.
