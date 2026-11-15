@@ -59,7 +59,7 @@ function keywordIndex(keyword: string): Uint8Array {
   );
 }
 
-function updateTokenAndMask(
+export function updateTokenAndMask(
   leafKey: Uint8Array,
 ): { token: Uint8Array; mask: Uint8Array } {
   const stream = chacha20Prg(
@@ -240,6 +240,18 @@ export class DianaClient {
       constrainedKey: serializeConstrained(constrained),
       addCount: count,
     };
+  }
+
+  /** Derives every expected update address and mask for a keyword locally. */
+  searchAddresses(keyword: string): Array<{ leaf: bigint; address: Uint8Array; mask: Uint8Array }> {
+    const token = this.search(keyword);
+    if (token.addCount === 0 || token.constrainedKey === null) return [];
+    const constrained = deserializeConstrained(token.constrainedKey);
+    assertConstrainedPrefix(constrained, token.addCount);
+    return evaluateConstrainedRange(constrained, 0n, BigInt(token.addCount - 1)).map(({ leaf, value }) => {
+      const derived = updateTokenAndMask(value);
+      return { leaf, address: derived.token, mask: derived.mask };
+    });
   }
 
   serializeState(): string {
